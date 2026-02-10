@@ -1,0 +1,34 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Stores every completed or interrupted session
+model Session {
+  id        Int      @id @default(autoincrement())
+  startTime DateTime @default(now())
+  endTime   DateTime?
+  duration  Int      // in seconds
+  type      String   // 'work', 'short-break', 'long-break'
+  completed Boolean  @default(false)
+  pauseCount Int     @default(0) // Tracks interruptions for AI analysis
+  
+  createdAt DateTime @default(now())
+}
+
+// Stores User Preferences and AI Insights
+model UserSettings {
+  id                 Int      @id @default(autoincrement())
+  workDuration       Int      @default(25)
+  shortBreakDuration Int      @default(5)
+  longBreakDuration  Int      @default(15)
+  
+  // AI Insights Cache
+  bestFocusTime      String?  // e.g., "08:00 - 11:00 AM"
+  interruptionTrend  String?  // e.g., "After 2:00 PM"
+  lastAnalysisDate   DateTime?
+}
