@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Brain, BarChart3, Coffee } from 'lucide-react';
+import { Brain, BarChart3, Clock, Coffee, Sun, CloudSun, Moon } from 'lucide-react';
 import clsx from 'clsx';
 
 /* MOCK DATA */
@@ -25,20 +25,31 @@ const mockProductivity = {
 
 export default function AnalyticsPage() {
   // Compute sorted productivity levels
-  const productivityLevels = useMemo(() => {
-    const periods = [
-      { period: 'MORNING', sessions: mockProductivity.morning },
-      { period: 'AFTERNOON', sessions: mockProductivity.afternoon },
-      { period: 'EVENING', sessions: mockProductivity.evening },
-    ];
+  // Fixed order productivity levels with colors
+  const fixedPeriods = [
+    { period: 'MORNING', sessions: mockProductivity.morning, icon: <Sun size={16} /> },
+    { period: 'AFTERNOON', sessions: mockProductivity.afternoon, icon: <CloudSun size={16} /> },
+    { period: 'EVENING', sessions: mockProductivity.evening, icon: <Moon size={16} />  },
+  ];
 
-    // Sort descending by sessions
-    periods.sort((a, b) => b.sessions - a.sessions);
+  // Assign High / Medium / Low based on sessions count
+  const max = Math.max(...fixedPeriods.map((p) => p.sessions));
+  const min = Math.min(...fixedPeriods.map((p) => p.sessions));
 
-    // Assign High, Medium, Low labels
-    const labels = ['High', 'Medium', 'Low'];
-    return periods.map((p, i) => ({ ...p, label: labels[i] }));
-  }, []);
+  const productivityLevels = fixedPeriods.map((p) => {
+    let label = 'Medium';
+    if (p.sessions === max) label = 'High';
+    else if (p.sessions === min) label = 'Low';
+    return { ...p, label };
+  });
+
+  // Background color mapping
+  const bgColors: Record<string, string> = {
+    High: 'bg-green-200 text-green-900',
+    Medium: 'bg-orange-200 text-orange-900',
+    Low: 'bg-red-200 text-red-900',
+  };
+
 
   return (
     <div className="flex h-screen bg-stone-50 text-stone-900 font-sans">
@@ -48,8 +59,9 @@ export default function AnalyticsPage() {
           <Brain className="text-stone-900" /> Pomodoro AI
         </h1>
         <nav className="flex flex-col gap-2">
-          <NavItem icon={<Brain size={20} />} label="Dashboard" active />
+          <NavItem icon={<Brain size={20} />} label="Dashboard" />
           <NavItem icon={<BarChart3 size={20} />} label="Analytics" active />
+          <NavItem icon={<Clock size={20} />} label="Session Summary" />
           <NavItem icon={<Coffee size={20} />} label="AI Tips" />
         </nav>
       </aside>
@@ -73,8 +85,14 @@ export default function AnalyticsPage() {
         {/* Productivity Levels */}
         <div className="bg-white p-6 rounded-xl shadow flex flex-col gap-2">
           {productivityLevels.map((p) => (
-            <p key={p.period}>
-              <strong>{p.period}:</strong> {p.label} Productivity
+            <p
+              key={p.period}
+              className={clsx(
+                'flex items-center gap-2 px-2 py-1 rounded font-medium w-max',
+                bgColors[p.label]
+              )}
+            >
+              {p.icon} <strong>{p.period}:</strong> {p.label} Productivity
             </p>
           ))}
         </div>
