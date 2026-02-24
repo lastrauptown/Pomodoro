@@ -1,13 +1,16 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { useTimerStore, TimerMode } from '@/lib/store/timerStore';
 import { Play, Pause, Square, Coffee, Brain, BarChart3 } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function Home() {
-  const { mode, timeLeft, isRunning, setMode, startTimer, pauseTimer, resetTimer, tick } = useTimerStore();
+  const { mode, timeLeft, isRunning, alarmOn, setMode, startTimer, pauseTimer, resetTimer, tick, stopAlarm } =
+    useTimerStore();
   const workerRef = useRef<Worker | null>(null);
+  const alarmRef = useRef<{ ctx: AudioContext; osc: OscillatorNode } | null>(null);
 
   // Initialize Web Worker
   useEffect(() => {
@@ -24,6 +27,40 @@ export default function Home() {
     else workerRef.current?.postMessage({ command: 'PAUSE' });
   }, [isRunning]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (alarmOn) {
+      if (!alarmRef.current) {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = 880;
+        gain.gain.value = 0.05;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        alarmRef.current = { ctx, osc };
+      }
+    } else {
+      if (alarmRef.current) {
+        alarmRef.current.osc.stop();
+        alarmRef.current.ctx.close();
+        alarmRef.current = null;
+      }
+    }
+
+    return () => {
+      if (alarmRef.current) {
+        alarmRef.current.osc.stop();
+        alarmRef.current.ctx.close();
+        alarmRef.current = null;
+      }
+    };
+  }, [alarmOn]);
+
   // Format Time (MM:SS)
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -39,9 +76,11 @@ export default function Home() {
           <Brain className="text-stone-900" /> Pomodoro AI
         </h1>
         <nav className="flex flex-col gap-2">
-          <NavItem icon={<Brain size={20} />} label="Dashboard" active />
-          <NavItem icon={<BarChart3 size={20} />} label="Analytics" />
-          <NavItem icon={<Coffee size={20} />} label="AI Tips" />
+          <NavItem href="/" icon={<Brain size={20} />} label="Dashboard" active />
+          <NavItem href="/analytics" icon={<BarChart3 size={20} />} label="Analytics" />
+          <NavItem href="/session-summary" icon={<Square size={20} />} label="Session Summary" />
+          <NavItem href="/ai" icon={<Coffee size={20} />} label="AI Tips" />
+          <NavItem href="/profile" icon={<Brain size={20} />} label="My Profile" />
         </nav>
       </aside>
 
@@ -83,6 +122,14 @@ export default function Home() {
           >
             <Square size={24} fill="currentColor" />
           </button>
+          {alarmOn && (
+            <button
+              onClick={stopAlarm}
+              className="px-6 py-3 rounded-2xl bg-red-100 text-red-900 font-medium border border-red-200 hover:bg-red-200 transition-colors"
+            >
+              Stop Ringing
+            </button>
+          )}
         </div>
 
         {/* Mode Switcher */}
@@ -97,18 +144,21 @@ export default function Home() {
 }
 
 // Components
-function NavItem({ icon, label, active }: { icon: any, label: string, active?: boolean }) {
+function NavItem({ href, icon, label, active }: { href: string; icon: any; label: string; active?: boolean }) {
   return (
-    <button className={clsx(
-      "flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left w-full",
-      active ? "bg-stone-100 text-stone-900 font-semibold" : "text-stone-500 hover:bg-stone-50 hover:text-stone-700"
-    )}>
+    <Link
+      href={href}
+      className={clsx(
+        "flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left w-full",
+        active ? "bg-stone-100 text-stone-900 font-semibold" : "text-stone-500 hover:bg-stone-50 hover:text-stone-700"
+      )}
+    >
       {icon} <span>{label}</span>
-    </button>
+    </Link>
   );
 }
 
-function ModeButton({ children, active, onClick }: { children: React.ReactNode, active: boolean, onClick: () => void }) {
+function ModeButton({ children, active, onClick }: { children: React.ReactNode; active: boolean; onClick: () => void }) {
   return (
     <button 
       onClick={onClick}

@@ -7,6 +7,7 @@ interface TimerState {
   mode: TimerMode;
   timeLeft: number;
   isRunning: boolean;
+  alarmOn: boolean;
   
   // Actions
   setMode: (mode: TimerMode) => void;
@@ -14,6 +15,7 @@ interface TimerState {
   pauseTimer: () => void;
   resetTimer: () => void;
   tick: () => void;
+  stopAlarm: () => void;
 }
 
 const DURATIONS = {
@@ -26,14 +28,16 @@ export const useTimerStore = create<TimerState>((set, get) => ({
   mode: 'work',
   timeLeft: DURATIONS['work'],
   isRunning: false,
+   alarmOn: false,
 
   setMode: (mode) => set({ 
     mode, 
     timeLeft: DURATIONS[mode],
-    isRunning: false 
+    isRunning: false,
+    alarmOn: false,
   }),
 
-  startTimer: () => set({ isRunning: true }),
+  startTimer: () => set({ isRunning: true, alarmOn: false }),
   
   pauseTimer: () => set({ isRunning: false }),
   
@@ -59,9 +63,11 @@ export const useTimerStore = create<TimerState>((set, get) => ({
          completed: true
        });
 
-       set({ isRunning: false, timeLeft: 0 });
+       set({ isRunning: false, timeLeft: 0, alarmOn: true });
     } else {
        set({ timeLeft: timeLeft - 1 });
     }
   },
+  
+  stopAlarm: () => set({ alarmOn: false }),
 }));

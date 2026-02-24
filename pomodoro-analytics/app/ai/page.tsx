@@ -1,44 +1,40 @@
 'use client';
 
-import React from 'react';
-import { Brain, BarChart3, Clock, Coffee, Sun, CloudSun, Moon } from 'lucide-react';
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { Brain, BarChart3, Coffee } from 'lucide-react';
 import clsx from 'clsx';
 
-/* MOCK DATA */
-const mockInsights = {
-  bestFocusTime: '7:00 PM - 9:00 PM',
-  frequentInterruptions: 'After 2:00 PM',
-  recommendedInterval: '50 MIN WORK / 10 MIN BREAK',
-};
-
 export default function AiTipsPage() {
-  const applyRecommendation = () => {
-    console.log('Apply recommendation clicked! Timer should change to 50/10 now.');
-  };
+  const [tips, setTips] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
- // Function to determine tip message based on best focus time
-    const getTipMessage = (time: string) => {
-        const hour = parseInt(time.split(':')[0]); // extract hour
-        if (time.includes('AM') && hour < 12) {
-        return (
-            <span className="flex items-center justify-center gap-2 p-4 rounded-lg bg-[#FFD400] text-[#A82323] font-medium">
-            <Sun size={24} /> Focus more in the <strong>morning</strong> for better productivity!
-            </span>
-        );
+  const handleGenerateTips = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch('/api/ai-tips', { method: 'POST' });
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          setError('Please log in or sign up to use AI tips.');
+        } else {
+          setError(data.error || 'Failed to generate tips');
         }
-        if (time.includes('PM') && hour < 6) {
-        return (
-            <span className="flex items-center justify-center gap-2 p-4 rounded-lg bg-[#FF5F00] text-[#F7F0F0] font-medium">
-            <CloudSun size={24} /> Focus more in the <strong>afternoon</strong> for better productivity!
-            </span>
-        );
-        }
-        return (
-        <span className="flex items-center justify-center gap-2 p-4 rounded-lg bg-[#7A73D1] text-[#EBD3F8] font-medium">
-            <Moon size={24} /> Focus more in the <strong>evening</strong> for better productivity!
-        </span>
-        );
-    };
+        setTips(null);
+        return;
+      }
+
+      setTips(data.tips);
+    } catch (e) {
+      setError('Network error while calling AI');
+      setTips(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="flex h-screen bg-stone-50 text-stone-900 font-sans">
@@ -48,74 +44,73 @@ export default function AiTipsPage() {
           <Brain className="text-stone-900" /> Pomodoro AI
         </h1>
         <nav className="flex flex-col gap-2">
-          <NavItem icon={<Brain size={20} />} label="Dashboard" />
-          <NavItem icon={<BarChart3 size={20} />} label="Analytics" />
-          <NavItem icon={<Clock size={20} />} label="Session Summary" />
-          <NavItem icon={<Coffee size={20} />} label="AI Tips" active />
+          <NavItem href="/" icon={<Brain size={20} />} label="Dashboard" />
+          <NavItem href="/analytics" icon={<BarChart3 size={20} />} label="Analytics" />
+          <NavItem href="/session-summary" icon={<Coffee size={20} />} label="Session Summary" />
+          <NavItem href="/ai" icon={<Coffee size={20} />} label="AI Tips" active />
+          <NavItem href="/profile" icon={<Brain size={20} />} label="My Profile" />
         </nav>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 p-12 gap-6 flex flex-col">
         {/* Page Title */}
-        <h2 className="text-2xl font-bold mb-6 w-full text-left">Productivity Insights</h2>
+        <h2 className="text-2xl font-bold mb-6 w-full text-left">AI Productivity Insights</h2>
 
         {/* 2-column layout */}
         <div className="flex gap-6 w-full">
-          {/* Left Column - smaller */}
           <div className="flex flex-col gap-6 flex-[0.6]">
-            {/* Best Focus Time Card */}
             <div className="bg-white p-6 rounded-xl shadow flex flex-col">
-              <p className="text-lg font-bold mb-6">{'Best Focus Time'}</p>
-              <div className="flex-1 flex items-center justify-center">
-                <p className="text-3xl font-bold">{mockInsights.bestFocusTime}</p>
-              </div>
+              <p className="text-lg font-bold mb-2">What this page does</p>
+              <p className="text-sm text-stone-600">
+                The AI reads your recent Pomodoro sessions from the database and generates
+                personalized tips based on your focus habits and break patterns.
+              </p>
             </div>
 
-            {/* Frequent Interruptions Card */}
             <div className="bg-white p-6 rounded-xl shadow flex flex-col">
-              <p className="text-lg font-bold mb-6">{'Frequent Interruptions'}</p>
-              <div className="flex-1 flex items-center justify-center">
-                <p className="text-3xl font-bold">{mockInsights.frequentInterruptions}</p>
-              </div>
+              <p className="text-lg font-bold mb-4">How to use it</p>
+              <ul className="list-disc pl-5 text-sm text-stone-600 space-y-1">
+                <li>Use the timer for a few sessions first.</li>
+                <li>Open this page and ask the AI for insights.</li>
+                <li>Adjust your work and break schedule based on the suggestions.</li>
+              </ul>
             </div>
           </div>
 
-          {/* Right Column - larger */}
           <div className="flex flex-col gap-6 flex-[1.4] items-center">
-            {/* Recommended Interval Card */}
             <div className="w-full p-6 rounded-xl shadow flex flex-col items-center justify-between">
-            {/* Title */}
-            <p className="text-3xl font-bold mb-6 text-center">Recommended Interval</p>
-
-            {/* Square Highlighted Interval */}
-            <div className="flex-1 flex items-center justify-center w-full">
-                <div 
-                    className="w-48 h-48 flex items-center justify-center rounded-lg"
-                    style={{ backgroundColor: '#BF4646', color: '#FFFFFF' }}
-                >
-                <p className="font-bold text-2xl text-center">
-                    {mockInsights.recommendedInterval}
-                </p>
-                </div>
-            </div>
-
-            {/* Button at bottom */}
-            <div className="mt-6 w-full flex justify-center">
+              <p className="text-3xl font-bold mb-4 text-center">Your AI Tips</p>
+              <div className="w-full min-h-[180px] rounded-lg bg-white border border-stone-200 p-4 overflow-y-auto whitespace-pre-wrap text-sm">
+                {loading && <p className="text-stone-500">Asking AI for insights...</p>}
+                {!loading && error && (
+                  <p className="text-red-500">
+                    {error}
+                  </p>
+                )}
+                {!loading && !error && tips && <p>{tips}</p>}
+                {!loading && !error && !tips && (
+                  <p className="text-stone-400">
+                    No tips yet. Start a few sessions, then click the button below to let the AI analyse your habits.
+                  </p>
+                )}
+              </div>
+              <div className="mt-6 w-full flex justify-center">
                 <button
-                    onClick={applyRecommendation}
-                    className="px-8 py-3 rounded-xl border-2 border-stone-900 text-stone-900 font-semibold text-lg bg-transparent transition-colors hover:bg-stone-900 hover:text-white"
-                    >
-                    Apply Recommendation
+                  onClick={handleGenerateTips}
+                  disabled={loading}
+                  className={clsx(
+                    'px-8 py-3 rounded-xl border-2 border-stone-900 font-semibold text-lg transition-colors',
+                    loading
+                      ? 'bg-stone-200 text-stone-500 border-stone-200 cursor-not-allowed'
+                      : 'bg-stone-900 text-white hover:bg-stone-800',
+                  )}
+                >
+                  {loading ? 'Generating...' : 'Ask AI For Tips'}
                 </button>
-
-            </div>
+              </div>
             </div>
           </div>
-        </div>
-        {/* Tip Message Below Main Content */}
-        <div className="w-full mt-6 p-4 rounded-lg text-center font-medium text-lg">
-          {getTipMessage(mockInsights.bestFocusTime)}
         </div>
       </main>
     </div>
@@ -123,9 +118,10 @@ export default function AiTipsPage() {
 }
 
 // NavItem component
-function NavItem({ icon, label, active }: { icon: any; label: string; active?: boolean }) {
+function NavItem({ href, icon, label, active }: { href: string; icon: any; label: string; active?: boolean }) {
   return (
-    <button
+    <Link
+      href={href}
       className={clsx(
         'flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left w-full',
         active
@@ -134,6 +130,6 @@ function NavItem({ icon, label, active }: { icon: any; label: string; active?: b
       )}
     >
       {icon} <span>{label}</span>
-    </button>
+    </Link>
   );
 }

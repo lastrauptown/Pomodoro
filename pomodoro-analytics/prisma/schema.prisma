@@ -7,28 +7,40 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Stores every completed or interrupted session
-model Session {
+model User {
   id        Int      @id @default(autoincrement())
-  startTime DateTime @default(now())
-  endTime   DateTime?
-  duration  Int      // in seconds
-  type      String   // 'work', 'short-break', 'long-break'
-  completed Boolean  @default(false)
-  pauseCount Int     @default(0) // Tracks interruptions for AI analysis
-  
+  email     String   @unique
+  name      String?
+  password  String
   createdAt DateTime @default(now())
+
+  sessions      Session[]
+  userSettings  UserSettings?
 }
 
-// Stores User Preferences and AI Insights
+model Session {
+  id         Int      @id @default(autoincrement())
+  startTime  DateTime @default(now())
+  endTime    DateTime?
+  duration   Int
+  type       String
+  completed  Boolean  @default(false)
+  pauseCount Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  userId Int?
+  user   User? @relation(fields: [userId], references: [id])
+}
+
 model UserSettings {
   id                 Int      @id @default(autoincrement())
   workDuration       Int      @default(25)
   shortBreakDuration Int      @default(5)
   longBreakDuration  Int      @default(15)
-  
-  // AI Insights Cache
-  bestFocusTime      String?  // e.g., "08:00 - 11:00 AM"
-  interruptionTrend  String?  // e.g., "After 2:00 PM"
+  bestFocusTime      String?
+  interruptionTrend  String?
   lastAnalysisDate   DateTime?
+
+  userId Int   @unique
+  user   User  @relation(fields: [userId], references: [id])
 }
