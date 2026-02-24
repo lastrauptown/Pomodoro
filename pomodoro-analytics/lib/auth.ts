@@ -1,4 +1,4 @@
-import { cookies } from 'next/headers';
+import { headers } from 'next/headers';
 import jwt from 'jsonwebtoken';
 
 const COOKIE_NAME = 'pomodoro_session';
@@ -22,11 +22,27 @@ export function getSessionCookieName() {
   return COOKIE_NAME;
 }
 
-export function getCurrentUserId(): number | null {
-  const cookie = cookies().get(COOKIE_NAME);
-  if (!cookie?.value) return null;
+export function getCurrentUserId(req?: Request): number | null {
+  let cookieHeader = '';
+  if (req) {
+    cookieHeader = req.headers.get('cookie') || '';
+  } else {
+    const h = headers();
+    // In some runtimes, headers() may not have get(); guard it
+    try {
+      // @ts-ignore
+      cookieHeader = (typeof h.get === 'function' ? h.get('cookie') : '') || '';
+    } catch {
+      cookieHeader = '';
+    }
+  }
+  const parts = cookieHeader.split(';').map((p) => p.trim());
+  const target = parts.find((p) => p.startsWith(COOKIE_NAME + '='));
+  if (!target) return null;
+  const token = decodeURIComponent(target.slice(COOKIE_NAME.length + 1));
+  if (!token) return null;
   try {
-    const decoded = jwt.verify(cookie.value, getSecret()) as TokenPayload;
+    const decoded = jwt.verify(token, getSecret()) as TokenPayload;
     return decoded.userId;
   } catch {
     return null;

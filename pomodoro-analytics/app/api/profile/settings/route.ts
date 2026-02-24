@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 
 export async function POST(request: Request) {
   try {
-    const userId = getCurrentUserId();
+    const userId = getCurrentUserId(request);
     if (!userId) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
@@ -37,4 +37,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
-

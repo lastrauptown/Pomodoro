@@ -1,29 +1,69 @@
-'use server';
+'use client';
 
-import { PrismaClient } from '@prisma/client';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Brain, BarChart3, Coffee, Clock } from 'lucide-react';
 import clsx from 'clsx';
-import { getCurrentUserId } from '@/lib/auth';
 
-const prisma = new PrismaClient();
+type SessionRow = {
+  id: number;
+  startTime: string;
+  type: string;
+  duration: number;
+  completed: boolean;
+  pauseCount: number;
+};
 
-async function getSessions(userId: number) {
-  return prisma.session.findMany({
-    where: { userId },
-    orderBy: { createdAt: 'desc' },
-    take: 20,
-  });
-}
+export default function SessionSummaryPage() {
+  const router = useRouter();
+  const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-export default async function SessionSummaryPage() {
-  const userId = getCurrentUserId();
-  if (!userId) {
-    redirect('/login');
+  useEffect(() => {
+    const run = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        // Check auth
+        const meRes = await fetch('/api/auth/me', {
+          cache: 'no-store',
+          credentials: 'include',
+        });
+        const meData = await meRes.json();
+        if (!meData?.user) {
+          router.replace('/login');
+          return;
+        }
+        // Load sessions
+        const res = await fetch('/api/sessions?limit=20', {
+          cache: 'no-store',
+          credentials: 'include',
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setError(data.error || 'Failed to load sessions');
+          return;
+        }
+        const data = await res.json();
+        setSessions(data.sessions || []);
+      } catch {
+        setError('Network error while loading sessions');
+      } finally {
+        setLoading(false);
+      }
+    };
+    run();
+  }, [router]);
+
+  if (loading) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-stone-50">
+        <p className="text-stone-500 text-sm">Loading sessions…</p>
+      </main>
+    );
   }
-
-  const sessions = await getSessions(userId);
 
   return (
     <div className="flex h-screen bg-stone-50 text-stone-900 font-sans">
@@ -44,6 +84,7 @@ export default async function SessionSummaryPage() {
         <h2 className="text-2xl font-bold">Session Summary</h2>
 
         <div className="bg-white rounded-xl shadow p-6 overflow-auto">
+          {error && <p className="text-sm text-red-600">{error}</p>}
           <table className="w-full text-sm">
             <thead className="text-left border-b border-stone-200">
               <tr className="text-stone-500">
@@ -57,21 +98,11 @@ export default async function SessionSummaryPage() {
             <tbody>
               {sessions.map((s) => (
                 <tr key={s.id} className="border-b border-stone-100 last:border-b-0">
-                  <td className="py-2 pr-4">
-                    {s.startTime.toLocaleString()}
-                  </td>
-                  <td className="py-2 pr-4 capitalize">
-                    {s.type}
-                  </td>
-                  <td className="py-2 pr-4">
-                    {Math.round(s.duration / 60)} min
-                  </td>
-                  <td className="py-2 pr-4">
-                    {s.completed ? 'Yes' : 'No'}
-                  </td>
-                  <td className="py-2 pr-4">
-                    {s.pauseCount}
-                  </td>
+                  <td className="py-2 pr-4">{new Date(s.startTime).toLocaleString()}</td>
+                  <td className="py-2 pr-4 capitalize">{s.type}</td>
+                  <td className="py-2 pr-4">{Math.round(s.duration / 60)} min</td>
+                  <td className="py-2 pr-4">{s.completed ? 'Yes' : 'No'}</td>
+                  <td className="py-2 pr-4">{s.pauseCount}</td>
                 </tr>
               ))}
               {sessions.length === 0 && (

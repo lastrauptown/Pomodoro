@@ -4,7 +4,7 @@ import { getCurrentUserId } from '@/lib/auth';
 
 const prisma = new PrismaClient();
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
 
@@ -15,7 +15,7 @@ export async function POST() {
       );
     }
 
-    const userId = getCurrentUserId();
+    const userId = getCurrentUserId(request);
     if (!userId) {
       return NextResponse.json(
         { error: 'Not authenticated' },

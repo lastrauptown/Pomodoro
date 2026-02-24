@@ -4,9 +4,9 @@ import { getCurrentUserId } from '@/lib/auth';
 
 const prisma = new PrismaClient();
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const userId = getCurrentUserId();
+    const userId = getCurrentUserId(request);
     if (!userId) {
       return NextResponse.json({ user: null });
     }
