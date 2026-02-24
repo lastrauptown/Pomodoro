@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Brain, BarChart3, Coffee, Clock } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -25,6 +26,7 @@ type MeResponse =
   | { user: null };
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [me, setMe] = useState<MeResponse['user'] | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -122,9 +124,9 @@ export default function ProfilePage() {
         </h1>
         <nav className="flex flex-col gap-2">
           <NavItem href="/" icon={<Brain size={20} />} label="Dashboard" />
-          <NavItem href="/analytics" icon={<BarChart3 size={20} />} label="Analytics" />
-          <NavItem href="/session-summary" icon={<Clock size={20} />} label="Session Summary" />
-          <NavItem href="/ai" icon={<Coffee size={20} />} label="AI Tips" />
+          <NavItem href="/analytics" icon={<BarChart3 size={20} />} label="Analytics" requiresAuth router={router} />
+          <NavItem href="/session-summary" icon={<Clock size={20} />} label="Session Summary" requiresAuth router={router} />
+          <NavItem href="/ai" icon={<Coffee size={20} />} label="AI Tips" requiresAuth router={router} />
           <NavItem href="/profile" icon={<Brain size={20} />} label="My Profile" active />
         </nav>
       </aside>
@@ -194,29 +196,53 @@ export default function ProfilePage() {
   );
 }
 
+async function handleProtectedNav(e: React.MouseEvent, href: string, router: ReturnType<typeof useRouter>) {
+  try {
+    e.preventDefault();
+    const res = await fetch('/api/auth/me', { cache: 'no-store', credentials: 'include' });
+    const data = await res.json();
+    if (data?.user) router.push(href);
+    else router.push(`/login?from=${encodeURIComponent(href)}`);
+  } catch {
+    router.push(`/login?from=${encodeURIComponent(href)}`);
+  }
+}
+
 function NavItem({
   href,
   icon,
   label,
   active,
+  requiresAuth,
+  router,
 }: {
   href: string;
   icon: any;
   label: string;
   active?: boolean;
+  requiresAuth?: boolean;
+  router?: ReturnType<typeof useRouter>;
 }) {
+  const classes = clsx(
+    'flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left w-full',
+    active ? 'bg-stone-100 text-stone-900 font-semibold' : 'text-stone-500 hover:bg-stone-50 hover:text-stone-700',
+  );
+
+  if (requiresAuth && router) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => { void handleProtectedNav(e as any, href, router); }}
+        className={classes}
+      >
+        {icon} <span>{label}</span>
+      </button>
+    );
+  }
+
   return (
-    <Link
-      href={href}
-      className={clsx(
-        'flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left w-full',
-        active
-          ? 'bg-stone-100 text-stone-900 font-semibold'
-          : 'text-stone-500 hover:bg-stone-50 hover:text-stone-700',
-      )}
-    >
+    <Link href={href} prefetch={false} className={classes}>
       {icon} <span>{label}</span>
     </Link>
   );
 }
-

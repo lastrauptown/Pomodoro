@@ -14,14 +14,9 @@ export async function GET(request: Request) {
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const sessions = await prisma.session.findMany({
-      where: {
-        userId,
-        startTime: {
-          gte: sevenDaysAgo,
-        },
-      },
-    });
+    const sessions = await prisma.$queryRaw<
+      { startTime: Date }[]
+    >`SELECT startTime FROM Session WHERE userId = ${userId} AND startTime >= ${sevenDaysAgo}`;
 
     const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 

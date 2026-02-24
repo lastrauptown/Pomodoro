@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { saveSession } from '@/app/actions';
 
 export type TimerMode = 'work' | 'short-break' | 'long-break';
 
@@ -56,12 +55,19 @@ export const useTimerStore = create<TimerState>((set, get) => ({
        // Timer Finished!
        const duration = DURATIONS[mode];
        
-       // Save to Database via Server Action
-       saveSession({
-         duration: duration,
-         type: mode,
-         completed: true
-       });
+       // Save to Database via API to ensure cookies are sent
+       try {
+         fetch('/api/sessions', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           credentials: 'include',
+           body: JSON.stringify({
+             duration,
+             type: mode,
+             completed: true,
+           }),
+         }).catch(() => {});
+       } catch {}
 
        set({ isRunning: false, timeLeft: 0, alarmOn: true });
     } else {

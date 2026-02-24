@@ -46,3 +46,32 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
+
+export async function POST(request: Request) {
+  try {
+    const userId = getCurrentUserId(request);
+    const body = await request.json().catch(() => ({}));
+    const duration = Number(body.duration) || 0;
+    const type = String(body.type || 'work');
+    const completed = Boolean(body.completed);
+
+    const startTime = new Date(Date.now() - duration * 1000);
+    const endTime = new Date();
+
+    await prisma.$executeRawUnsafe(
+      'INSERT INTO Session (startTime, endTime, duration, type, completed, pauseCount, userId, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
+      startTime,
+      endTime,
+      duration,
+      type,
+      completed ? 1 : 0,
+      0,
+      userId ?? null,
+    );
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('sessions POST error', error);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  }
+}

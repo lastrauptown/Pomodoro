@@ -2,15 +2,18 @@
 
 import React, { useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useTimerStore, TimerMode } from '@/lib/store/timerStore';
-import { Play, Pause, Square, Coffee, Brain, BarChart3 } from 'lucide-react';
+import { Play, Pause, Square, Coffee, Brain, BarChart3, Clock } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function Home() {
+  const router = useRouter();
   const { mode, timeLeft, isRunning, alarmOn, setMode, startTimer, pauseTimer, resetTimer, tick, stopAlarm } =
     useTimerStore();
   const workerRef = useRef<Worker | null>(null);
-  const alarmRef = useRef<{ ctx: AudioContext; osc: OscillatorNode } | null>(null);
+  const bellIntervalRef = useRef<number | null>(null);
+  const primedAudioRef = useRef<AudioContext | null>(null);
 
   // Initialize Web Worker
   useEffect(() => {
@@ -30,33 +33,63 @@ export default function Home() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    if (alarmOn) {
-      if (!alarmRef.current) {
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        const ctx = new AudioCtx();
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+
+    // One-shot bell chime
+    const playBell = (ctx: AudioContext) => {
+      const now = ctx.currentTime;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.22, now + 0.01); // quick attack
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2); // ring out
+      gain.connect(ctx.destination);
+
+      const makePartial = (freq: number, detune: number, type: OscillatorType = 'sine', weight = 1) => {
         const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = 880;
-        gain.gain.value = 0.05;
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        alarmRef.current = { ctx, osc };
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, now);
+        if (typeof osc.detune !== 'undefined') {
+          osc.detune.setValueAtTime(detune, now);
+        }
+        const partGain = ctx.createGain();
+        partGain.gain.setValueAtTime(weight, now);
+        osc.connect(partGain);
+        partGain.connect(gain);
+        osc.start(now);
+        osc.stop(now + 1.3);
+      };
+
+      // Bell-ish spectrum (fundamental + inharmonic overtones)
+      makePartial(880, -6, 'sine', 1);
+      makePartial(1320, 3, 'sine', 0.7);
+      makePartial(1760, 0, 'sine', 0.5);
+      makePartial(1100, -10, 'triangle', 0.4);
+      makePartial(2350, 0, 'sine', 0.25);
+    };
+
+    if (alarmOn) {
+      const ctx = primedAudioRef.current ?? new AudioCtx();
+      primedAudioRef.current = ctx;
+      try {
+        // @ts-ignore
+        if (typeof ctx.resume === 'function') ctx.resume();
+      } catch {}
+      // Play immediately and then repeat periodically
+      playBell(ctx);
+      if (bellIntervalRef.current == null) {
+        bellIntervalRef.current = window.setInterval(() => playBell(ctx), 1200);
       }
     } else {
-      if (alarmRef.current) {
-        alarmRef.current.osc.stop();
-        alarmRef.current.ctx.close();
-        alarmRef.current = null;
+      if (bellIntervalRef.current != null) {
+        window.clearInterval(bellIntervalRef.current);
+        bellIntervalRef.current = null;
       }
     }
 
     return () => {
-      if (alarmRef.current) {
-        alarmRef.current.osc.stop();
-        alarmRef.current.ctx.close();
-        alarmRef.current = null;
+      if (bellIntervalRef.current != null) {
+        window.clearInterval(bellIntervalRef.current);
+        bellIntervalRef.current = null;
       }
     };
   }, [alarmOn]);
@@ -77,10 +110,10 @@ export default function Home() {
         </h1>
         <nav className="flex flex-col gap-2">
           <NavItem href="/" icon={<Brain size={20} />} label="Dashboard" active />
-          <NavItem href="/analytics" icon={<BarChart3 size={20} />} label="Analytics" />
-          <NavItem href="/session-summary" icon={<Square size={20} />} label="Session Summary" />
-          <NavItem href="/ai" icon={<Coffee size={20} />} label="AI Tips" />
-          <NavItem href="/profile" icon={<Brain size={20} />} label="My Profile" />
+          <NavItem href="/analytics" icon={<BarChart3 size={20} />} label="Analytics" requiresAuth router={router} />
+          <NavItem href="/session-summary" icon={<Clock size={20} />} label="Session Summary" requiresAuth router={router} />
+          <NavItem href="/ai" icon={<Coffee size={20} />} label="AI Tips" requiresAuth router={router} />
+          <NavItem href="/profile" icon={<Brain size={20} />} label="My Profile" requiresAuth router={router} />
         </nav>
       </aside>
 
@@ -101,7 +134,20 @@ export default function Home() {
         <div className="flex gap-6 items-center">
           {!isRunning ? (
             <button 
-              onClick={startTimer}
+              onClick={() => {
+                // Prime audio on user gesture
+                if (typeof window !== 'undefined') {
+                  const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+                  if (!primedAudioRef.current) {
+                    primedAudioRef.current = new AudioCtx();
+                  }
+                  try {
+                    // @ts-ignore
+                    primedAudioRef.current.resume?.();
+                  } catch {}
+                }
+                startTimer();
+              }}
               className="flex items-center gap-3 px-10 py-5 bg-stone-900 text-white rounded-2xl hover:bg-stone-800 transition-all shadow-xl hover:shadow-2xl text-xl font-medium"
             >
               <Play fill="currentColor" size={24} /> Start Timer
@@ -144,15 +190,52 @@ export default function Home() {
 }
 
 // Components
-function NavItem({ href, icon, label, active }: { href: string; icon: any; label: string; active?: boolean }) {
+async function handleProtectedNav(e: React.MouseEvent, href: string, router: ReturnType<typeof useRouter>) {
+  try {
+    e.preventDefault();
+    const res = await fetch('/api/auth/me', { cache: 'no-store', credentials: 'include' });
+    const data = await res.json();
+    if (data?.user) router.push(href);
+    else router.push(`/login?from=${encodeURIComponent(href)}`);
+  } catch {
+    router.push(`/login?from=${encodeURIComponent(href)}`);
+  }
+}
+
+function NavItem({
+  href,
+  icon,
+  label,
+  active,
+  requiresAuth,
+  router,
+}: {
+  href: string;
+  icon: any;
+  label: string;
+  active?: boolean;
+  requiresAuth?: boolean;
+  router?: ReturnType<typeof useRouter>;
+}) {
+  const classes = clsx(
+    "flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left w-full",
+    active ? "bg-stone-100 text-stone-900 font-semibold" : "text-stone-500 hover:bg-stone-50 hover:text-stone-700"
+  );
+
+  if (requiresAuth && router) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => { void handleProtectedNav(e as any, href, router); }}
+        className={classes}
+      >
+        {icon} <span>{label}</span>
+      </button>
+    );
+  }
+
   return (
-    <Link
-      href={href}
-      className={clsx(
-        "flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left w-full",
-        active ? "bg-stone-100 text-stone-900 font-semibold" : "text-stone-500 hover:bg-stone-50 hover:text-stone-700"
-      )}
-    >
+    <Link href={href} prefetch={false} className={classes}>
       {icon} <span>{label}</span>
     </Link>
   );

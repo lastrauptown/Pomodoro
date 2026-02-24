@@ -16,20 +16,14 @@ export async function POST(request: Request) {
     const shortBreakDuration = Number(body.shortBreakDuration) || 5;
     const longBreakDuration = Number(body.longBreakDuration) || 15;
 
-    await prisma.userSettings.upsert({
-      where: { userId },
-      update: {
-        workDuration,
-        shortBreakDuration,
-        longBreakDuration,
-      },
-      create: {
-        userId,
-        workDuration,
-        shortBreakDuration,
-        longBreakDuration,
-      },
-    });
+    await prisma.$executeRawUnsafe(
+      'INSERT INTO UserSettings (userId, workDuration, shortBreakDuration, longBreakDuration) VALUES (?, ?, ?, ?) ' +
+        'ON DUPLICATE KEY UPDATE workDuration = VALUES(workDuration), shortBreakDuration = VALUES(shortBreakDuration), longBreakDuration = VALUES(longBreakDuration)',
+      userId,
+      workDuration,
+      shortBreakDuration,
+      longBreakDuration,
+    );
 
     return NextResponse.json({ success: true });
   } catch (error) {
